@@ -2,22 +2,37 @@ import os
 import sys
 from datetime import datetime
 import design
+import about
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QMessageBox, QTableWidgetItem
+from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QBrush
 from PyQt5.QtGui import QColor
+
+class Window2(QtWidgets.QMainWindow, design.Ui_MainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Window")
 
 class MyApp(QtWidgets.QMainWindow, design.Ui_MainWindow):
 
     def __init__(self):
-
         super().__init__()
         self.setupUi(self)
         self.pushButton.clicked.connect(self.getStatistics)
         self.pushButtonAbout.clicked.connect(self.showDialog)
         self.tableWidget.setRowCount(0)
         self.tableWidget.setColumnCount(0)
+        self.dateEditTo.setDate(datetime.now())
+        self.dateEditFrom.setDate(datetime(datetime.now().year,1,1))
+        # self.calendarWidgetTo.setSelectedDate(datetime.now())
+        # self.calendarWidgetFrom.setSelectedDate(datetime(datetime.now().year,1,1))
         self.getStatistics()
+
+
+    def window2(self):
+        self.w = Window2()
+        self.w.show()
+
 
     def getStatistics(self):
         dirname = os.path.dirname(__file__)
@@ -71,83 +86,151 @@ class MyApp(QtWidgets.QMainWindow, design.Ui_MainWindow):
         excluded_rows = []
 
         for j in range(2, len(ar[0])):
-            empty = True
-            for i in range(0, kol-1):
+            for i in range(0, kol):
                 if ar[i][j] != 0:
                     empty = False
                     totals[j] = totals[j] + ar[i][j]
-            if (empty)or(abs(totals[j]) < limit):
-                excluded.append(j)
+
         excluded.append(1)
 
-        for i in range(0, kol - 1):
+        for i in range(0, kol):
             empty = True
             for j in range(2, len(ar[0])):
                 if ar[i][j] != 0:
                     empty = False
+
+            d = datetime.strptime(ar[i][0], '%d.%m.%Y').date()
+            d = datetime(d.year, d.month, d.day)
+            dFrom = datetime(self.dateEditFrom.date().year(), self.dateEditFrom.date().month(), self.dateEditFrom.date().day())
+            dTo = datetime(self.dateEditTo.date().year(), self.dateEditTo.date().month(), self.dateEditTo.date().day())
+            # dFrom = datetime(self.calendarWidgetFrom.selectedDate().year(), self.calendarWidgetFrom.selectedDate().month(), self.calendarWidgetFrom.selectedDate().day())
+            # dTo = datetime(self.calendarWidgetTo.selectedDate().year(), self.calendarWidgetTo.selectedDate().month(), self.calendarWidgetTo.selectedDate().day())
             if empty:
                 excluded_rows.append(i)
-        print(excluded_rows)
+            elif (d < dFrom) or (d > dTo):
+                excluded_rows.append(i)
         top = []
 
         self.tableWidget.setRowCount(0)
-        self.tableWidget.setColumnCount(0)
+        self.tableWidget.setColumnCount(1)
         columns = 0
-        list_headers = [""]
+        #
 
         totals = totals[1:]
-        a = ar
-        for i in range(1, len(totals) - 1):
+        for i in range(0, len(totals)):
             for j in range(1, i):
                 if totals[i] > totals[j]:
                     sw = totals[i]
                     totals[i] = totals[j]
                     totals[j] = sw
 
-                    for k in range(0, len(a) - 1):
-                        sw = a[k][i + 1]
-                        a[k][i + 1] = a[k][j + 1]
-                        a[k][j + 1] = sw
+                    for k in range(0, len(ar)):
+                        sw = ar[k][i + 1]
+                        ar[k][i + 1] = ar[k][j + 1]
+                        ar[k][j + 1] = sw
 
                     sw = headers[i+1]
                     headers[i+1] = headers[j+1]
                     headers[j + 1] = sw
 
-        for i in range(2, len(headers)):
-            st_item = headers[i].replace('totalOfSelected', 'Total').replace('-PERP', '')
-            if not(i in excluded):
-                list_headers.append(st_item + '\n' + str(float('{:.1f}'.format(float(totals[i-1])))))
-                columns += 1
-                self.tableWidget.setColumnCount(self.tableWidget.columnCount() + 1)
 
-            top.append((st_item, totals[i-1]))
+        self.tableWidget.setRowCount(kol-len(excluded_rows))
+
+        totals = []
+
+        list_headers = []
+        for j in range(2, len(ar[i])):
+            if not (j in excluded):
+                sum = 0
+                for i in range(0, kol):
+                    if not (i in excluded_rows):
+                        if ar[i][j] != 0:
+                            sum = sum + float(ar[i][j])
+                if sum != 0:
+                    st_item = headers[j].replace('totalOfSelected', 'Total').replace('-PERP', '')
+                    list_headers.append(st_item + '\n' + str(float('{:.1f}'.format(float(sum)))))
+                    totals.append(sum)
+                    self.tableWidget.setColumnCount(self.tableWidget.columnCount() + 1)
+                else:
+                    excluded.append(j)
+        self.tableWidget.setHorizontalHeaderLabels(list_headers)
+
+        rows = 0
+
+        for i in range(0, kol):
+            if not (i in excluded_rows):
+                rows += 1
+                cols = 0
+                for j in range(1, len(ar[i])):
+                    if not (j in excluded):
+                        cols += 1
+                        if ar[i][j] != 0:
+                            self.tableWidget.setItem(rows-1, cols, QTableWidgetItem('{:.1f}'.format(float(ar[i][j]))))
+                        else:
+                            self.tableWidget.setItem(rows-1, cols, QTableWidgetItem(str('')))
+
+                    self.tableWidget.setItem(rows-1, 0, QTableWidgetItem(str(ar[i][0])))
+
+        for i in range(1, len(totals)):
+            for j in range(1, i):
+                if totals[i] > totals[j]:
+                    sw = totals[i]
+                    totals[i] = totals[j]
+                    totals[j] = sw
+
+                    sw = list_headers[i]
+                    list_headers[i] = list_headers[j]
+                    list_headers[j] = sw
+
+                    for k in range(0, self.tableWidget.rowCount()):
+                        if self.tableWidget.item(k,i+1) == None:
+                            sw =  QTableWidgetItem('')
+                        else:
+                            sw =  QTableWidgetItem(self.tableWidget.item(k,i+1).text())
+
+                        if self.tableWidget.item(k,j+1) == None:
+                            obj =  QTableWidgetItem('')
+                        else:
+                            obj =  QTableWidgetItem(self.tableWidget.item(k,j+1).text())
+
+                        self.tableWidget.setItem(k,i+1,obj)
+                        self.tableWidget.setItem(k,j+1,sw)
+
+        list_vertical_headers = []
+
+        for i in range(1, self.tableWidget.rowCount()):
+            for j in range(1, self.tableWidget.columnCount()):
+                if self.tableWidget.item(i,j) != None:
+                    if self.tableWidget.item(i,j).text() == '':
+                        cell = 0
+                    else:
+                        cell = float(self.tableWidget.item(i,j).text())
+                    if cell < 0:
+                        self.tableWidget.item(i, j).setForeground(QBrush(QColor(255, 0, 0)))
+
+        for i in range(0, self.tableWidget.rowCount()):
+            d = datetime.strptime(str(self.tableWidget.item(i,0).text()), '%d.%m.%Y').date().strftime('%a')
+            d = d.replace('Mon', 'Пн')
+            d = d.replace('Tue', 'Вт')
+            d = d.replace('Wed', 'Ср')
+            d = d.replace('Thu', 'Чт')
+            d = d.replace('Fri', 'Пт')
+            d = d.replace('Sat', 'Сб')
+            d = d.replace('Sun', 'Вс')
+            list_vertical_headers.append(str(i+1) + ') '+ str(self.tableWidget.item(i,0).text()))
+
+        self.tableWidget.setVerticalHeaderLabels(list_vertical_headers)
+
+        self.tableWidget.removeColumn(0)
 
         self.tableWidget.setHorizontalHeaderLabels(list_headers)
 
-        self.tableWidget.setRowCount(kol-1-len(excluded_rows))
-        rows = 0
-        for i in range(0, kol-1):
-            if not (i in excluded_rows):
-                rows += 1
-                for j in range(1, len(ar[i])-1):
-                    if not (j in excluded):
-                        if ar[i][j] != 0:
-                            self.tableWidget.setItem(rows-1, j-1, QTableWidgetItem(str(float('{:.1f}'.format(float(ar[i][j]))))))
-                            if ar[i][j] > 0:
-                                self.tableWidget.item(rows-1, j-1).setForeground(QBrush(QColor('green')))
-                            else:
-                                self.tableWidget.item(rows-1, j-1).setForeground(QBrush(QColor(255, 0, 0)))
-                        else:
-                            self.tableWidget.setItem(rows-1, j - 1, QTableWidgetItem(str('')))
-                self.tableWidget.setItem(rows-1, 0, QTableWidgetItem(str(ar[i][0])))
-
-
-        for i in range(1, self.tableWidget.columnCount()):
+        for i in range(0, self.tableWidget.columnCount()):
             self.tableWidget.resizeColumnToContents(i)
 
-   def showDialog(self):
+    def showDialog(self):
         QMessageBox.about(self, "О программе","""
-FTX PnL Statistics v0.1
+FTX PnL Statistics v0.2
 
 Контакты:
 t.me/s1esarev
